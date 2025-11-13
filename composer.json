@@ -1,0 +1,25 @@
+{
+    "name": "thirtybees/tbpaypalcheckout",
+    "description": "PayPal Checkout integration for ThirtyBees using modern REST API with Guzzle HTTP client",
+    "type": "prestashop-module",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Petr Hučík",
+            "email": "petr@thirtybees.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "config": {
+        "platform": {
+            "php": "7.4"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Thirtybees\\Module\\TbPayPal\\": "src/"
+        }
+    }
+}

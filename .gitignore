@@ -1,0 +1,8 @@
+.idea
+config_*.xml
+config.xml
+*.zip
+.DS_Store
+vendor
+apk
+logs/*.log

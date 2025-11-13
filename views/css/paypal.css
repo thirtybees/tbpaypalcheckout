@@ -1,0 +1,206 @@
+/**
+ * PayPal Checkout Pro - Stylesheet
+ *
+ * @author    thirty bees b.v.
+ * @copyright Copyright (c) 2025 thirty bees b.v. https://thirtybees.com
+ * @license   Proprietary License - All rights reserved
+ */
+
+/* Payment Option Styling */
+.payment_module a.paypal-checkout {
+    background: #ffffff;
+    border: 1px solid #d6d4d4;
+    display: block;
+    padding: 15px 20px;
+    text-decoration: none;
+    color: #333333;
+    font-weight: bold;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.payment_module a.paypal-checkout:hover {
+    background: #f5f5f5;
+    border-color: #0070ba;
+    box-shadow: 0 2px 8px rgba(0, 112, 186, 0.2);
+}
+
+.payment_module a.paypal-checkout img {
+    float: none;
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.payment_module a.paypal-checkout .paypal-description {
+    display: block;
+    font-size: 13px;
+    font-weight: normal;
+    color: #666666;
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+/* EU Payment Option */
+.paypal-eu-payment {
+    display: inline-block;
+    margin: 0 10px;
+}
+
+.paypal-eu-payment a.paypal-eu-link {
+    display: block;
+    padding: 10px;
+    border: 1px solid #d6d4d4;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.paypal-eu-payment a.paypal-eu-link:hover {
+    border-color: #0070ba;
+    box-shadow: 0 2px 8px rgba(0, 112, 186, 0.2);
+}
+
+.paypal-eu-payment img {
+    max-height: 40px;
+    width: auto;
+    display: block;
+}
+
+/* Validation Page */
+.paypal-redirect-info {
+    text-align: center;
+    padding: 30px 20px;
+}
+
+.paypal-redirect-info p {
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.paypal-redirect-info .payment-summary {
+    font-size: 18px;
+    margin: 25px auto;
+    max-width: 400px;
+}
+
+/* Loading Animation */
+@keyframes paypal-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.paypal-loading {
+    display: inline-block;
+    animation: paypal-spin 1s linear infinite;
+}
+
+/* Sandbox Mode Warning */
+.alert-warning.paypal-sandbox {
+    border-left: 4px solid #ffa500;
+    background-color: #fff8e1;
+    color: #856404;
+}
+
+/* PayPal Button Styling */
+.btn-paypal {
+    background-color: #0070ba;
+    border-color: #0070ba;
+    color: #ffffff;
+    font-weight: bold;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.btn-paypal:hover {
+    background-color: #005a9c;
+    border-color: #005a9c;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 112, 186, 0.3);
+}
+
+.btn-paypal:active,
+.btn-paypal:focus {
+    background-color: #004c82;
+    border-color: #004c82;
+    color: #ffffff;
+}
+
+/* Responsive Design */
+@media (max-width: 767px) {
+    .payment_module a.paypal-checkout {
+        padding: 12px 15px;
+        font-size: 14px;
+    }
+    
+    .payment_module a.paypal-checkout img {
+        height: 20px;
+    }
+    
+    .paypal-redirect-info {
+        padding: 20px 10px;
+    }
+    
+    .paypal-redirect-info p {
+        font-size: 14px;
+    }
+}
+
+/* Admin Configuration Styles */
+.paypal-config-header {
+    background: linear-gradient(135deg, #0070ba 0%, #005a9c 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 4px 4px 0 0;
+    margin-bottom: 20px;
+}
+
+.paypal-config-header h2 {
+    margin: 0;
+    color: white;
+    font-size: 24px;
+}
+
+.paypal-config-section {
+    background: #f8f9fa;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    border-left: 4px solid #0070ba;
+}
+
+.paypal-config-section h3 {
+    margin-top: 0;
+    color: #0070ba;
+    font-size: 18px;
+}
+
+/* Log Viewer Styles */
+.paypal-log-viewer {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 15px;
+    border-radius: 4px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.paypal-log-viewer .log-error {
+    color: #f48771;
+}
+
+.paypal-log-viewer .log-warning {
+    color: #dcdcaa;
+}
+
+.paypal-log-viewer .log-info {
+    color: #4ec9b0;
+}
+
+.paypal-log-viewer .log-debug {
+    color: #9cdcfe;
+}
