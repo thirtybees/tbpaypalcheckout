@@ -50,7 +50,7 @@ class TbPayPalCheckout extends PaymentModule
     {
         $this->name = 'tbpaypalcheckout';
         $this->tab = 'payments_gateways';
-        $this->version = '0.0.1';
+        $this->version = '0.0.2';
         $this->author = 'thirty bees';
         $this->need_instance = 1;
         $this->bootstrap = true;
@@ -242,24 +242,33 @@ class TbPayPalCheckout extends PaymentModule
      */
     public function getContent()
     {
-        $output = '';
+        $messages = '';
 
         $settings = $this->factory->getSettings();
         $logger = $this->factory->getLogger();
         $api = $this->factory->getApi();
-        
+
         // Handle form submission
         if (Tools::isSubmit('submit' . $this->name)) {
-            $output .= $this->processConfigurationForm($api, $settings, $logger);
+            $messages .= $this->processConfigurationForm($api, $settings, $logger);
         }
-        
+
         // Display any warnings
-        $output .= $this->displayWarnings($settings);
-        
-        // Display configuration form
-        $output .= $this->displayConfigurationForm($settings);
-        
-        return $output;
+        $messages .= $this->displayWarnings($settings);
+
+        $this->context->smarty->assign([
+            'tbpaypal_messages' => $messages,
+            'tbpaypal_form' => $this->displayConfigurationForm($settings),
+            'tbpaypal_show_manual' => !$settings->validCredentials(),
+            'tbpaypal_sandbox' => $settings->getMode() === Settings::MODE_SANDBOX,
+            'tbpaypal_webhook_url' => $this->getWebhookUrl(),
+            'tbpaypal_shop_enabled' => (bool)Configuration::get('PS_SHOP_ENABLE'),
+            'tbpaypal_multistore' => Shop::isFeatureActive(),
+            'tbpaypal_payment_link' => $this->context->link->getAdminLink('AdminPayment'),
+            'tbpaypal_log_file' => 'log/paypal-' . date('Ymd') . '.log',
+        ]);
+
+        return $this->display(__FILE__, 'views/templates/admin/configure.tpl');
     }
 
     /**
@@ -319,7 +328,7 @@ class TbPayPalCheckout extends PaymentModule
         // Validate and save Mode
         $mode = (string)Tools::getValue(static::INPUT_MODE);
         if (! in_array($mode, [Settings::MODE_LIVE, Settings::MODE_SANDBOX])) {
-            $model = Settings::MODE_SANDBOX;
+            $mode = Settings::MODE_SANDBOX;
         }
         $settings->setMode($mode);
 
