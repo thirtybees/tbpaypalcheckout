@@ -21,6 +21,7 @@ namespace Thirtybees\Module\TbPayPal\Processor;
 
 use Cart;
 use Configuration;
+use Currency;
 use Customer;
 use Order;
 use PrestaShopException;
@@ -123,6 +124,19 @@ class ProcessorImpl implements Processor
             throw new PrestaShopException('Payment was not approved. Status: ' . $details['status']);
         }
 
+        // The approved amount must still match the cart, the cart can change after the PayPal order was created
+        $approvedAmount = $details['purchase_units'][0]['amount'] ?? null;
+        if (! $this->amountMatchesCart($cart, $approvedAmount)) {
+            $this->logger->error('Approved PayPal amount does not match the cart', [
+                'paypalOrderId' => $paypalOrderId,
+                'cart_id' => $cartId,
+                'approved' => $approvedAmount,
+                'cart_total' => $this->formatAmount((float)$cart->getOrderTotal(true, Cart::BOTH)),
+                'cart_currency' => $this->getCartCurrencyCode($cart),
+            ]);
+            throw new PrestaShopException('Cart amount or currency has changed, payment was not captured');
+        }
+
         // Capture or Authorize the payment
         $intent = $this->settings->getIntent();
 
@@ -170,8 +184,9 @@ class ProcessorImpl implements Processor
         // Get transaction ID
         $transactionId = $this->getTransactionId($captureResult);
 
-        // Calculate total
-        $total = (float)$cart->getOrderTotal(true, Cart::BOTH);
+        // Amount that PayPal really captured or authorized. Core puts the order in the payment
+        // error state when this differs from the cart total
+        $total = $this->getPaidAmount($cart, $captureResult);
 
         // Validate order
         $this->module->validateOrder(
@@ -221,6 +236,75 @@ class ProcessorImpl implements Processor
 
         // Fallback to order ID
         return $capture_result['id'] ?? 'UNKNOWN';
+    }
+
+    /**
+     * Returns the amount PayPal captured or authorized, in the cart currency.
+     * A payment in another currency counts as nothing paid.
+     *
+     * @param Cart $cart
+     * @param array $captureResult
+     * @return float
+     * @throws PrestaShopException
+     */
+    private function getPaidAmount(Cart $cart, array $captureResult): float
+    {
+        $payments = $captureResult['purchase_units'][0]['payments'] ?? [];
+        $amount = $payments['captures'][0]['amount'] ?? $payments['authorizations'][0]['amount'] ?? null;
+        if (! is_array($amount) || ! isset($amount['value'], $amount['currency_code'])) {
+            $this->logger->error('PayPal response has no captured amount', ['cart_id' => (int)$cart->id]);
+            return 0.0;
+        }
+        if (strtoupper((string)$amount['currency_code']) !== $this->getCartCurrencyCode($cart)) {
+            $this->logger->error('PayPal captured another currency than the cart', [
+                'cart_id' => (int)$cart->id,
+                'captured' => $amount,
+                'cart_currency' => $this->getCartCurrencyCode($cart),
+            ]);
+            return 0.0;
+        }
+        return (float)$amount['value'];
+    }
+
+    /**
+     * Checks that a PayPal amount (currency_code + value) equals the current cart total
+     *
+     * @param Cart $cart
+     * @param array|null $amount
+     * @return bool
+     * @throws PrestaShopException
+     */
+    private function amountMatchesCart(Cart $cart, $amount): bool
+    {
+        if (! is_array($amount) || ! isset($amount['value'], $amount['currency_code'])) {
+            return false;
+        }
+        if (strtoupper((string)$amount['currency_code']) !== $this->getCartCurrencyCode($cart)) {
+            return false;
+        }
+        $cartTotal = $this->formatAmount((float)$cart->getOrderTotal(true, Cart::BOTH));
+        return $this->formatAmount((float)$amount['value']) === $cartTotal;
+    }
+
+    /**
+     * Same format as the amount sent to PayPal when the order is created
+     *
+     * @param float $amount
+     * @return string
+     */
+    private function formatAmount(float $amount): string
+    {
+        return number_format($amount, 2, '.', '');
+    }
+
+    /**
+     * @param Cart $cart
+     * @return string
+     */
+    private function getCartCurrencyCode(Cart $cart): string
+    {
+        $currency = new Currency((int)$cart->id_currency);
+        return strtoupper((string)$currency->iso_code);
     }
 
 }
