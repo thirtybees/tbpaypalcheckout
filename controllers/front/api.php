@@ -18,6 +18,7 @@
  */
 
 use Thirtybees\Core\Error\Response\JSendErrorResponse;
+use Thirtybees\Module\TbPayPal\Model\PayPalOrder;
 
 if (!defined('_TB_VERSION_')) {
     exit;
@@ -144,6 +145,12 @@ class TbPayPalCheckoutApiModuleFrontController extends ModuleFrontController
      */
     private function approveOrder(string $paypalOrderId): array
     {
+        $paypalOrder = PayPalOrder::getByPaypalId($paypalOrderId);
+        if (! Validate::isLoadedObject($paypalOrder)
+            || ! $this->isVisitorCart(new Cart((int)$paypalOrder->id_cart))
+        ) {
+            throw new PrestaShopException("Paypal order with id $paypalOrderId does not belong to the visitor's cart");
+        }
         $processor = $this->module->getFactory()->getProcessor();
         $order = $processor->validateOrder($paypalOrderId);
         return [
@@ -151,6 +158,32 @@ class TbPayPalCheckoutApiModuleFrontController extends ModuleFrontController
             'reference' => (string)$order->reference,
             'redirect' => $this->getOrderConfirmationLink($order)
         ];
+    }
+
+    /**
+     * The cart must be the visitor's current cart, or a cart of the customer
+     * (guest or registered) in the visitor's cookie. Core drops the cart from
+     * the cookie once an order exists for it, so the customer check covers
+     * a second approve after the order was created.
+     *
+     * @param Cart $cart
+     * @return bool
+     * @throws PrestaShopException
+     */
+    private function isVisitorCart(Cart $cart): bool
+    {
+        if (! Validate::isLoadedObject($cart)) {
+            return false;
+        }
+        if ((int)$this->context->cart->id && (int)$cart->id === (int)$this->context->cart->id) {
+            return true;
+        }
+
+        $customer = $this->context->customer;
+        return (int)$customer->id
+            && (int)$cart->id_customer === (int)$customer->id
+            && (int)$customer->id === (int)$this->context->cookie->id_customer
+            && $customer->isLogged(true);
     }
 
     /**
