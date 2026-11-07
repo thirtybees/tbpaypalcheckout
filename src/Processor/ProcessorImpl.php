@@ -23,14 +23,18 @@ use Cart;
 use Configuration;
 use Currency;
 use Customer;
+use Db;
+use DbQuery;
 use Order;
 use PrestaShopException;
+use PrestaShopLogger;
 use SmartyException;
 use TbPayPalCheckout;
 use Thirtybees\Module\TbPayPal\Api\PayPalAPI;
 use Thirtybees\Module\TbPayPal\Logger\Logger;
 use Thirtybees\Module\TbPayPal\Model\PayPalOrder;
 use Thirtybees\Module\TbPayPal\Settings\Settings;
+use Throwable;
 use Validate;
 
 class ProcessorImpl implements Processor
@@ -86,7 +90,6 @@ class ProcessorImpl implements Processor
      * @param string $paypalOrderId
      * @return Order
      * @throws PrestaShopException
-     * @throws SmartyException
      */
     public function validateOrder(string $paypalOrderId): Order
     {
@@ -107,6 +110,35 @@ class ProcessorImpl implements Processor
         $cart = new Cart((int)$paypalOrder->id_cart);
         if (! Validate::isLoadedObject($cart)) {
             throw new PrestaShopException("Cart with id $cartId does not exist");
+        }
+
+        // Two tabs or a double click can approve two PayPal orders for the same cart. Only one of
+        // them may be captured, so the check for an existing order and the capture run in the lock
+        return $this->withCartLock($cartId, function () use ($paypalOrderId, $cartId, $cart) {
+            return $this->validateOrderLocked($paypalOrderId, $cartId, $cart);
+        });
+    }
+
+    /**
+     * @param string $paypalOrderId
+     * @param int $cartId
+     * @param Cart $cart
+     * @return Order
+     * @throws PrestaShopException
+     */
+    private function validateOrderLocked(string $paypalOrderId, int $cartId, Cart $cart): Order
+    {
+        $paypalOrder = PaypalOrder::getByPaypalId($paypalOrderId);
+        if (! Validate::isLoadedObject($paypalOrder)) {
+            throw new PrestaShopException("Paypal order with id $paypalOrderId does not exist");
+        }
+        $existingOrderId = $this->getOrderIdByCartId($cartId);
+        if ($existingOrderId) {
+            if ((int)$paypalOrder->id_order === $existingOrderId) {
+                $this->logger->debug("Paypal order $paypalOrderId is already linked with order " . $existingOrderId);
+                return new Order($existingOrderId);
+            }
+            throw new PrestaShopException("Cart $cartId already has order $existingOrderId, PayPal order $paypalOrderId was not captured");
         }
 
         // Get latest order details from PayPal
@@ -146,17 +178,65 @@ class ProcessorImpl implements Processor
             $captureResult = $this->api->captureOrder($paypalOrder->paypal_order_id);
         }
 
-        // Update order with capture/auth details
-        $paypalOrder->updateFromPayPalOrder($captureResult);
+        try {
+            // Update order with capture/auth details
+            $paypalOrder->updateFromPayPalOrder($captureResult);
 
+            // Create ThirtyBees order
+            $order = $this->createThirtybeesOrder($cart, $captureResult);
 
-        // Create ThirtyBees order
-        $order = $this->createThirtybeesOrder($cart, $captureResult);
-
-        // Link PayPal order to shop order
-        $paypalOrder->linkToOrder((int)$order->id);
+            // Link PayPal order to shop order
+            $paypalOrder->linkToOrder((int)$order->id);
+        } catch (Throwable $e) {
+            // The module has no refund or void call, the merchant has to do this in PayPal
+            $transactionId = $this->getTransactionId($captureResult);
+            $message = "PayPal payment $transactionId (PayPal order $paypalOrderId, cart $cartId) was captured or authorized but no order was created. Refund or void it in PayPal.";
+            $this->logger->exception($message, $e, ['captureResult' => $captureResult]);
+            throw new PrestaShopException($message, 0, $e);
+        }
 
         return $order;
+    }
+
+    /**
+     * Runs $work while holding a MySQL lock on the cart
+     *
+     * @param int $cartId
+     * @param callable $work
+     * @return Order
+     * @throws PrestaShopException
+     */
+    private function withCartLock(int $cartId, callable $work): Order
+    {
+        $lockName = 'tbpaypalcheckout_cart_' . _DB_PREFIX_ . $cartId;
+        $conn = Db::getInstance();
+        if (! (int)$conn->getValue('SELECT GET_LOCK("' . pSQL($lockName) . '", 30)')) {
+            throw new PrestaShopException("Could not acquire the order lock for cart $cartId");
+        }
+        try {
+            return $work();
+        } finally {
+            $conn->execute('SELECT RELEASE_LOCK("' . pSQL($lockName) . '")');
+        }
+    }
+
+    /**
+     * Order of the cart, read from the master database. Order::getOrderByCartId() reads from
+     * the slave, a lagging slave would hide the order the previous request just created.
+     *
+     * @param int $cartId
+     * @return int
+     * @throws PrestaShopException
+     */
+    private function getOrderIdByCartId(int $cartId): int
+    {
+        return (int)Db::getInstance()->getValue(
+            (new DbQuery())
+                ->select('`id_order`')
+                ->from('orders')
+                ->where('`id_cart` = ' . $cartId)
+                ->orderBy('`id_order`')
+        );
     }
 
     /**
@@ -300,6 +380,7 @@ class ProcessorImpl implements Processor
     /**
      * @param Cart $cart
      * @return string
+     * @throws PrestaShopException
      */
     private function getCartCurrencyCode(Cart $cart): string
     {
