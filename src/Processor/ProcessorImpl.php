@@ -27,7 +27,6 @@ use Db;
 use DbQuery;
 use Order;
 use PrestaShopException;
-use PrestaShopLogger;
 use SmartyException;
 use TbPayPalCheckout;
 use Thirtybees\Module\TbPayPal\Api\PayPalAPI;
@@ -178,12 +177,24 @@ class ProcessorImpl implements Processor
             $captureResult = $this->api->captureOrder($paypalOrder->paypal_order_id);
         }
 
+        $paymentStatus = $this->getPaymentStatus($captureResult);
+        $orderState = $this->getOrderState($paymentStatus);
+        if (! $orderState) {
+            $paypalOrder->updateFromPayPalOrder($captureResult);
+            $this->logger->error('PayPal did not accept the payment', [
+                'paypalOrderId' => $paypalOrderId,
+                'cart_id' => $cartId,
+                'status' => $paymentStatus,
+            ]);
+            throw new PrestaShopException('PayPal did not accept the payment. Status: ' . $paymentStatus);
+        }
+
         try {
             // Update order with capture/auth details
             $paypalOrder->updateFromPayPalOrder($captureResult);
 
             // Create ThirtyBees order
-            $order = $this->createThirtybeesOrder($cart, $captureResult);
+            $order = $this->createThirtybeesOrder($cart, $captureResult, $orderState);
 
             // Link PayPal order to shop order
             $paypalOrder->linkToOrder((int)$order->id);
@@ -244,22 +255,14 @@ class ProcessorImpl implements Processor
      *
      * @param Cart $cart
      * @param array $captureResult
+     * @param int $orderState
      * @return Order
      * @throws PrestaShopException
      * @throws SmartyException
      */
-    private function createThirtybeesOrder(Cart $cart, array $captureResult): Order
+    private function createThirtybeesOrder(Cart $cart, array $captureResult, int $orderState): Order
     {
         $customer = new Customer((int)$cart->id_customer);
-
-        // Determine order state based on intent
-        $intent = $this->settings->getIntent();
-
-        if ($intent === Settings::INTENT_AUTHORIZE) {
-            $order_state = (int)Configuration::get('PS_OS_BANKWIRE'); // Awaiting payment
-        } else {
-            $order_state = (int)Configuration::get('PS_OS_PAYMENT'); // Payment accepted
-        }
 
         // Get transaction ID
         $transactionId = $this->getTransactionId($captureResult);
@@ -271,7 +274,7 @@ class ProcessorImpl implements Processor
         // Validate order
         $this->module->validateOrder(
             $cart->id,
-            $order_state,
+            $orderState,
             $total,
             $this->module->displayName,
             null,
@@ -297,6 +300,44 @@ class ProcessorImpl implements Processor
 
         $order = new Order($orderId);
         return $order;
+    }
+
+    /**
+     * Status of the capture or authorization in a PayPal capture/authorize response
+     *
+     * @param array $captureResult
+     * @return string
+     */
+    private function getPaymentStatus(array $captureResult): string
+    {
+        $payments = $captureResult['purchase_units'][0]['payments'] ?? [];
+        $payment = $payments['captures'][0] ?? $payments['authorizations'][0] ?? [];
+        return strtoupper((string)($payment['status'] ?? ''));
+    }
+
+    /**
+     * Order state for a capture or authorization status. Only a completed capture is paid,
+     * a pending capture and an authorization wait for payment, anything else is refused (0).
+     *
+     * @param string $paymentStatus
+     * @return int
+     * @throws PrestaShopException
+     */
+    private function getOrderState(string $paymentStatus): int
+    {
+        if ($this->settings->getIntent() === Settings::INTENT_AUTHORIZE) {
+            if (in_array($paymentStatus, ['CREATED', 'PENDING'], true)) {
+                return (int)Configuration::get('PS_OS_BANKWIRE'); // Awaiting payment
+            }
+            return 0;
+        }
+        if ($paymentStatus === 'COMPLETED') {
+            return (int)Configuration::get('PS_OS_PAYMENT'); // Payment accepted
+        }
+        if ($paymentStatus === 'PENDING') {
+            return (int)Configuration::get('PS_OS_BANKWIRE'); // Awaiting payment
+        }
+        return 0;
     }
 
     /**
