@@ -50,22 +50,31 @@ class TbPayPalCheckoutApiModuleFrontController extends ModuleFrontController
     {
         static::getErrorHandler()->setErrorResponseHandler(new JSendErrorResponse(_PS_MODE_DEV_));
 
-        // Allow CORS requests
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? static::METHOD_GET);
-        header("Access-Control-Allow-Origin: *");
-        header("Access-Control-Allow-Headers: *");
 
-        if ($method === self::METHOD_OPTIONS) {
-            exit;
+        if (Configuration::getGlobalValue('TBPAYPAL_CORS_ENABLED')) {
+            // Enable CORS when allowed. Useful during development
+            header("Access-Control-Allow-Origin: *");
+            header("Access-Control-Allow-Headers: *");
+            if ($method === self::METHOD_OPTIONS) {
+                exit;
+            }
         }
 
         if ($method !== static::METHOD_POST) {
             throw new PrestaShopException("Invalid HTTP request method");
         }
+        $contentType = strtolower(trim(explode(';', (string)($_SERVER['CONTENT_TYPE'] ?? ''))[0]));
+        if ($contentType !== 'application/json') {
+            throw new PrestaShopException("Invalid request content type");
+        }
 
         parent::init();
 
         $body = $this->getBody();
+        if (! hash_equals(Tools::getToken(false), (string)($body['token'] ?? ''))) {
+            throw new PrestaShopException("Invalid request token");
+        }
         $action = (string)($body['action'] ?? '');
         switch ($action) {
             case 'createOrder':

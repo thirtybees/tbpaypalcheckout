@@ -5,7 +5,7 @@
  * @see https://developer.paypal.com/sdk/js/reference/
  */
 
-function initTbPaypal(buttonContainerId, apiUrl)
+function initTbPaypal(buttonContainerId, apiUrl, apiToken)
 {
     // Check if PayPal SDK is loaded
     if (typeof window['paypal'] === 'undefined') {
@@ -74,7 +74,8 @@ function initTbPaypal(buttonContainerId, apiUrl)
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    action: 'createOrder'
+                    action: 'createOrder',
+                    token: apiToken
                 })
             })
             .then(function(response) {
@@ -109,7 +110,8 @@ function initTbPaypal(buttonContainerId, apiUrl)
                 },
                 body: JSON.stringify({
                     action: 'approveOrder',
-                    id: data.orderID
+                    id: data.orderID,
+                    token: apiToken
                 })
             })
                 .then(function(response) {

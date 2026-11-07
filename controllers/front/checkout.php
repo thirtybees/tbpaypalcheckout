@@ -69,6 +69,7 @@ class TbPayPalCheckoutCheckoutModuleFrontController extends ModuleFrontControlle
 
         $smarty->assign([
             'tbPaypalApiUrl' => $link->getModuleLink($this->module->name, 'api'),
+            'tbPaypalApiToken' => Tools::getToken(false),
         ]);
         $this->setTemplate('checkout.tpl');
     }

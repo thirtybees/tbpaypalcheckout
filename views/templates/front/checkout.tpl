@@ -19,6 +19,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        initTbPaypal('paypal-button-container', '{$tbPaypalApiUrl}')
+        initTbPaypal('paypal-button-container', '{$tbPaypalApiUrl|escape:'javascript':'UTF-8'}', '{$tbPaypalApiToken|escape:'javascript':'UTF-8'}')
     });
 </script>
