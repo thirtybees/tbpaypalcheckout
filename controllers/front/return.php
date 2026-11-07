@@ -57,11 +57,16 @@ class TbPayPalCheckoutReturnModuleFrontController extends ModuleFrontController
             $this->redirectToHome('Invalid cart');
             return;
         }
-        
+
+        if (!$this->isVisitorCart($cart)) {
+            $this->redirectToHome('Invalid cart');
+            return;
+        }
+
         // Check if order already exists
         $orderId = Order::getOrderByCartId($cart_id);
         $order = new Order($orderId);
-        if (Validate::isLoadedObject($order)) {
+        if (Validate::isLoadedObject($order) && $order->module === $this->module->name) {
             $this->redirectToOrderConfirmation($order);
             return;
         }
@@ -91,6 +96,29 @@ class TbPayPalCheckoutReturnModuleFrontController extends ModuleFrontController
             
             $this->setTemplate('return.tpl');
         }
+    }
+
+    /**
+     * The cart must be the visitor's current cart, or a cart of the customer
+     * (guest or registered) in the visitor's cookie. Core drops the cart from
+     * the cookie once an order exists for it, so the customer check covers
+     * the return after the order was created.
+     *
+     * @param Cart $cart
+     * @return bool
+     * @throws PrestaShopException
+     */
+    private function isVisitorCart(Cart $cart): bool
+    {
+        if ((int)$this->context->cart->id && (int)$cart->id === (int)$this->context->cart->id) {
+            return true;
+        }
+
+        $customer = $this->context->customer;
+        return (int)$customer->id
+            && (int)$cart->id_customer === (int)$customer->id
+            && (int)$customer->id === (int)$this->context->cookie->id_customer
+            && $customer->isLogged(true);
     }
 
     /**
