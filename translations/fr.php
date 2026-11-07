@@ -102,7 +102,7 @@ $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_630f6dc397fe74e52d5189e
 $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_734082edf44417dd19cc65943aa65c36'] = 'Client Secret';
 $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_76525f0f34b48475e5ca33f71d296f3b'] = 'Client ID';
 $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_77719d2073f19c4737412f87185dc715'] = 'Mode Live actif';
-$_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_8f3999d034904380056654a75c5af760'] = 'Saisissez le Client Secret de votre application PayPal REST API';
+$_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_75ac3bd711d729148248a89f63615e80'] = 'Saisissez le Client Secret de votre application PayPal REST API. Laissez le champ vide pour garder le secret actuel.';
 $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_a28a28c34ccd114c861a2f5d3e58aa61'] = 'Le module est configuré et prêt à traiter des paiements réels.';
 $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_a82c4ea6352017b8cbe19837e6f2a4af'] = 'Mode débogage';
 $_MODULE['<{tbpaypalcheckout}thirtybees>tbpaypalcheckout_b9f5c797ebbf55adccdd8539a65a0241'] = 'Désactivé';

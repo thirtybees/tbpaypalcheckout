@@ -336,7 +336,12 @@ class TbPayPalCheckout extends PaymentModule
         $clientId = trim((string)Tools::getValue(static::INPUT_CLIENT_ID));
         $oldClientId = $settings->getClientId();
         $oldClientSecret = $settings->getClientSecret();
+
+        // read client secret. If empty, use the previous value
         $clientSecret = trim((string)Tools::getValue(static::INPUT_CLIENT_SECRET));
+        if ($clientSecret === '') {
+            $clientSecret = $oldClientSecret;
+        }
 
         $credentialsSet = ($clientId && $clientSecret && ($oldClientId !== $clientId || $oldClientSecret !== $clientSecret));
 
@@ -503,13 +508,13 @@ class TbPayPalCheckout extends PaymentModule
         $helper->fields_value = [
             static::INPUT_MODE => $settings->getMode(),
             static::INPUT_CLIENT_ID => $settings->getClientId(),
-            static::INPUT_CLIENT_SECRET => $settings->getClientSecret(),
+            static::INPUT_CLIENT_SECRET => '',
             static::INPUT_INTENT => $settings->getIntent(),
             static::INPUT_DEBUG_MODE => $settings->isDebugMode() ? 1 : 0,
         ];
         
         return $helper->generateForm([
-            $this->getConfigForm(),
+            $this->getConfigForm($settings),
             $this->getWebhookForm()
         ]);
     }
@@ -542,7 +547,7 @@ class TbPayPalCheckout extends PaymentModule
     /**
      * Create Configuration Form Structure
      */
-    protected function getConfigForm(): array
+    protected function getConfigForm(Settings $settings): array
     {
         return [
             'form' => [
@@ -585,8 +590,9 @@ class TbPayPalCheckout extends PaymentModule
                         'label' => $this->l('Client Secret'),
                         'name' => static::INPUT_CLIENT_SECRET,
                         'size' => 80,
-                        'required' => true,
-                        'desc' => $this->l('Enter your PayPal REST API Client Secret'),
+                        'required' => $settings->getClientSecret() === '',
+                        'autocomplete' => false,
+                        'desc' => $this->l('Enter your PayPal REST API Client Secret. Leave empty to keep the saved secret.'),
                     ],
                     [
                         'type' => 'select',
